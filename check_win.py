@@ -67,7 +67,7 @@ new_game_button = tk.Button(
     text="start new game",
     background="white",
     width=18,
-    command= lambda: start_new_game(),
+    command=lambda: start_new_game(),
 )
 new_game_button.grid(row=2, column=0)
 
@@ -120,13 +120,26 @@ def check_win(column, row):
 
     if check_up_diagonal(target, row, column):
         win_types.add("up diagonal")
-    if check_down_diagonal(target, row, column):
+    if is_down_diagonal_won(target, row, column):
         win_types.add("down diagonal")
     if len(win_types) > 0:
         player_win(win_type=(" and ".join(win_types)))
         return True
     else:
         return False
+
+
+def is_down_diagonal_won(target_cell, row, column):
+    current_down_diagonal = get_down_diagonal(row, column)
+    current_run = 0
+    for cell in current_down_diagonal:
+        if cell == target_cell:
+            current_run += 1
+        else:
+            current_run = 0
+        if current_run >= 4:
+            return True
+    return False
 
 
 def get_up_diagonal(row, column):
@@ -161,19 +174,6 @@ def check_up_diagonal(target, row, column):
     current_up_diagonal = get_up_diagonal(row, column)
     current_run = 0
     for i in current_up_diagonal:
-        if i == target:
-            current_run += 1
-        else:
-            current_run = 0
-        if current_run >= 4:
-            return True
-    return False
-
-
-def check_down_diagonal(target, row, column):
-    current_down_diagonal = get_down_diagonal(row, column)
-    current_run = 0
-    for i in current_down_diagonal:
         if i == target:
             current_run += 1
         else:

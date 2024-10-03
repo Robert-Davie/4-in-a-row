@@ -11,6 +11,9 @@ game_over = tk.BooleanVar(value=False)
 replay_frame_by_frame_on = tk.BooleanVar(value=False)
 
 
+replay_next_frame_var = tk.BooleanVar(value=False)
+
+
 def toggle_computer_off():
     if computer_on.get():
         computer_on.set(False)
