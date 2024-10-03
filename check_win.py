@@ -13,6 +13,7 @@ theoretical_board = [
 current_heights = [0, 0, 0, 0, 0, 0, 0]
 moves = []
 labels = []
+overall_estimate = []
 
 
 def undo_move():
@@ -36,6 +37,7 @@ undo_button.grid(row=0, column=0)
 
 
 def start_new_game():
+    overall_estimate.clear()
     for i in labels:
         for j in i:
             j["background"] = "white"
@@ -65,7 +67,7 @@ new_game_button = tk.Button(
     text="start new game",
     background="white",
     width=18,
-    command=start_new_game,
+    command= lambda: start_new_game(),
 )
 new_game_button.grid(row=2, column=0)
 
@@ -79,6 +81,7 @@ def player_win(win_type):
 
 def close_game():
     game_over.set(True)
+    print(f"game trajectory {overall_estimate}")
     with open("replays.txt", "w") as f:
         f.write("".join([str(i) for i in moves]))
     for button in choices.buttons:

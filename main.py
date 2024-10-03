@@ -170,9 +170,10 @@ def one_step_down_diagonal_win():
         current_diagonal = get_down_diagonal(current_column_height, current_column)[
             ::-1
         ]
+        position_in_diagonal = min(current_column, 6-current_column_height)
         current_run = 0
         for i0, i in enumerate(current_diagonal):
-            if i == "C" or i0 == current_column:
+            if i == "C" or i0 == position_in_diagonal:
                 current_run += 1
             else:
                 if current_run >= 4:
@@ -270,16 +271,18 @@ def try_block_up_diagonal():
     return False
 
 
-def try_block_down_diagonal_win(choice_mode=True):
+def try_block_down_diagonal_win():
     for current_column in range(7):
+
         current_column_height = current_heights[current_column]
         if current_column_height >= 6:
             continue
         current_diagonal = get_down_diagonal(current_column_height, current_column)[
             ::-1
         ]
+        position_in_diagonal = min(current_column, 6 - current_column_height)
 
-        if longest_human_one_away(current_diagonal, current_column):
+        if longest_human_one_away(current_diagonal, position_in_diagonal):
             print("blocked down diagonal")
             root.update()
             time.sleep(computer_wait_time)
@@ -320,7 +323,7 @@ def estimated_tile_value(column):
     m = max(column, row)
     n = min(column, row)
     return {
-        (0, 0): 3,
+        (0, 0): 1,  # decreased this value to 2 to reduce going in corners
         (0, 1): 4,
         (0, 2): 5,
         (0, 3): 7,
@@ -719,6 +722,85 @@ def would_allow_cliff(column):
         return True
     return False
 
+def is_pattern_present(column, column_min, column_max, row_min, row_max, pattern):
+    row = current_heights[column]
+    pattern_present = False
+    if row_min <= row < row_max:
+        if column_min <= column <= column_max:
+            if all(
+                [theoretical_board[row + i[0]][column + i[1]] == i[2] for i in pattern]
+            ):
+                pattern_present = True
+        if 6 - column_max <= column <= 6 - column_min:
+            if all(
+                [theoretical_board[row + i[0]][column - i[1]] == i[2] for i in pattern]
+            ):
+                pattern_present = True
+    if pattern_present:
+        return True
+    return False
+
+
+def is_pattern_present_simple(column, pattern):
+    row = current_heights[column]
+    pattern_rows = [i[0] for i in pattern]
+    pattern_columns = [i[1] for i in pattern]
+    row_min = 0 - min(pattern_rows)
+    row_max = 6 - max(pattern_rows)
+    column_min = 0 - min(pattern_columns)
+    column_max = 6 - max(pattern_columns)
+    pattern_present = False
+    if row_min <= row < row_max:
+        if column_min <= column <= column_max:
+            if all(
+                [theoretical_board[row + i[0]][column + i[1]] == i[2] for i in pattern]
+            ):
+                pattern_present = True
+        if 6 - column_max <= column <= 6 - column_min:
+            if all(
+                [theoretical_board[row + i[0]][column - i[1]] == i[2] for i in pattern]
+            ):
+                pattern_present = True
+    if pattern_present:
+        return True
+    return False
+
+
+def above_cell_causes_human_win(column):
+    row_number_above_cell = current_heights[column] + 1
+    win_type = ""
+    if row_number_above_cell >= 7:
+        return False
+
+    row_above = theoretical_board[row_number_above_cell]
+    up_diagonal_above = get_up_diagonal(
+        row_number_above_cell, column
+    )
+    down_diagonal_above = get_down_diagonal(
+        row_number_above_cell, column
+    )[::-1]
+
+    if longest_human_one_away(row_above, column):
+        win_type = "horizontal"
+    up_diagonal_skip_cell = min(column, row_number_above_cell)
+    if longest_human_one_away(up_diagonal_above, up_diagonal_skip_cell):
+        win_type = "up diagonal"
+    down_diagonal_skip_cell = min(column, 6-row_number_above_cell)
+    if longest_human_one_away(down_diagonal_above, down_diagonal_skip_cell):
+        win_type = "down diagonal"
+    if win_type == "":
+        return False
+    else:
+        print(f"avoiding column {column} to prevent human {win_type} win")
+        return True
+
+
+def pre_make_choice(this_choice, message):
+    print(f"choosing column {this_choice} {message}")
+    root.update()
+    time.sleep(computer_wait_time)
+    make_choice(this_choice)
+
 
 def make_computer_move():
     try_one_step_win()
@@ -733,73 +815,145 @@ def make_computer_move():
             to_remove.append(k)
     computer_choice_order = [i for i in computer_choice_order if i not in to_remove]
     for temp_choice in computer_choice_order:
-        if arch_sequence(temp_choice):
-            return
-        if cross_sequence(temp_choice):
-            return
-        if turrets_sequence(temp_choice):
-            return
-        if slug_sequence(temp_choice):
-            return
-        if cliff_sequence(temp_choice):
-            return
-        if arrowhead_attack(temp_choice):
-            return
-
+        if not above_cell_causes_human_win(temp_choice):
+            if arch_sequence(temp_choice):
+                return
+            if cross_sequence(temp_choice):
+                return
+            if turrets_sequence(temp_choice):
+                return
+            if slug_sequence(temp_choice):
+                return
+            if cliff_sequence(temp_choice):
+                return
+            if arrowhead_attack(temp_choice):
+                return
+            if is_pattern_present_simple(
+                column=temp_choice,
+                pattern=[[0, 1, "H"], [0, 2, ""], [0, 3, "H"], [2, 3, "H"], [3, 4, "H"]]
+            ):
+                pre_make_choice(temp_choice, message="to avoid dustpan attack")
+                return
+            if is_pattern_present_simple(
+                column=temp_choice,
+                pattern=[[-1, -1, "H"], [-1, 1, "H"], [1, -1, "H"], [1, 1, "H"]]
+            ):
+                pre_make_choice(temp_choice, message="to avoid x attack")
+                return
+            if is_pattern_present_simple(
+                column=temp_choice,
+                pattern=[[-1, -1, ""], [-1, 0, "H"], [-2, 0, "H"], [0, 1, "H"], [-1, 2, "H"], [0, 2, ""], [-1, 3, ""]]
+            ):
+                pre_make_choice(temp_choice, message="to avoid hidden arch 1 attack")
+                return
+            if is_pattern_present_simple(
+                column=temp_choice,
+                pattern=[[-1, -1, ""], [-1, 0, "H"], [-2, 0, "H"], [0, 1, "H"], [-1, 2, "C"], [0, 2, ""], [-1, 3, ""]]
+            ):
+                pre_make_choice(temp_choice, message="to avoid hidden arch 2 attack")
+                return
     last_choice = computer_choice_order[-1]
+    while len(computer_choice_order) > 1:
+        if above_cell_causes_human_win(last_choice):
+            computer_choice_order.pop()
+            last_choice = computer_choice_order[-1]
+        else:
+            break
+    print(computer_choice_order, "computer choice order...")
 
     for computer_choice in computer_choice_order:
         if computer_choice == last_choice:
-            print("no other options available")
-            root.update()
-            time.sleep(computer_wait_time)
-            make_choice(computer_choice)
+            pre_make_choice(computer_choice, "as no other options available")
             break
 
-        if would_allow_arch(computer_choice):
-            continue
-        if would_allow_turret(computer_choice):
-            continue
         if len(moves) == 1 and computer_choice in [0, 6]:
             print("avoiding corner move as first COMPUTER move")
             continue
 
-        row_number_above_cell = current_heights[computer_choice] + 1
-        if row_number_above_cell <= 6:
-            row_above = theoretical_board[row_number_above_cell]
-            if longest_human_one_away(row_above, computer_choice):
-                print(
-                    f"avoiding column {computer_choice} to prevent human horizontal win"
-                )
-                continue
-            up_diagonal_above = get_up_diagonal(
-                current_heights[computer_choice] + 1, computer_choice
-            )
-            if longest_human_one_away(
-                up_diagonal_above,
-                min(computer_choice, current_heights[computer_choice] + 1),
-            ):
-                print(
-                    f"avoiding column {computer_choice} to prevent human up diagonal win"
-                )
-                continue
-            down_diagonal_above = get_down_diagonal(
-                current_heights[computer_choice] + 1, computer_choice
-            )[::-1]
-            if longest_human_one_away(down_diagonal_above, computer_choice):
-                print(
-                    f"avoiding column {computer_choice} to prevent human down diagonal win"
-                )
-                continue
+        if above_cell_causes_human_win(computer_choice):
+            continue
 
-        print("COMPUTER has made RANDOM choice")
-        root.update()
-        time.sleep(computer_wait_time)
-        make_choice(computer_choice)
+        if is_pattern_present_simple(
+            column=computer_choice,
+            pattern=[[0, -1, ""], [1, 1, "H"], [1, 2, "H"]]
+        ):
+            print(f"skipping column {computer_choice} as would allow cliff")
+            continue
+        if is_pattern_present_simple(
+            column=computer_choice,
+            pattern=[[0, -3, ""], [1, -2, "H"], [1, -1, "H"]]
+        ):
+            print(f"skipping column {computer_choice} as would allow cliff")
+            continue
+        if is_pattern_present_simple(
+            column=computer_choice,
+            pattern=[[0, -2, ""], [1, -1, "H"], [1, 1, "H"]]
+        ):
+            print(f"skipping column {computer_choice} as would allow cliff")
+            continue
+        if is_pattern_present_simple(
+            column=computer_choice,
+            pattern=[[1, 1, "H"], [2, 2, "H"], [2, 3, ""]]
+        ):
+            print(f"skipping column {computer_choice} as would allow spear")
+            continue
+        if would_allow_arch(computer_choice):
+            continue
+        if would_allow_turret(computer_choice):
+            continue
+
+        pre_make_choice(computer_choice, "which COMPUTER has chosen RANDOMLY")
         break
 
 
+def poisoned_rows_total(copies_h, copies_c):
+    res = 0
+    for i in range(7):
+        for j in range(4):
+            board_row = [
+                theoretical_board[i][j],
+                theoretical_board[i][j + 1],
+                theoretical_board[i][j + 2],
+                theoretical_board[i][j + 3],
+            ]
+            if board_row.count("H") == copies_h and board_row.count("C") == copies_c:
+                res += 1
+    for i in range(4):
+        for j in range(7):
+            board_column = [
+                theoretical_board[i][j],
+                theoretical_board[i + 1][j],
+                theoretical_board[i + 2][j],
+                theoretical_board[i + 3][j],
+            ]
+            if board_column.count("H") == copies_h and board_column.count("C") == copies_c:
+                res += 1
+    for i in range(4):
+        for j in range(4):
+            board_up_diagonal = [
+                theoretical_board[i][j],
+                theoretical_board[i + 1][j + 1],
+                theoretical_board[i + 2][j + 2],
+                theoretical_board[i + 3][j + 3],
+            ]
+            if board_up_diagonal.count("H") == copies_h and board_up_diagonal.count("C") == copies_c:
+                res += 1
+    for i in range(4):
+        for j in range(4):
+            board_down_diagonal = [
+                theoretical_board[i][6 - j],
+                theoretical_board[i + 1][5 - j],
+                theoretical_board[i + 2][4 - j],
+                theoretical_board[i + 3][3 - j],
+            ]
+            if board_down_diagonal.count("H") == copies_h and board_down_diagonal.count("C") == copies_c:
+                res += 1
+    return res
+
+
 def make_choice(column):
+    if current_player.get() == "HUMAN":
+        print("----- ----- ----- ----- -----")
     print(f"{current_player.get()} has made choice {column}")
     if game_over.get():
         return
@@ -819,6 +973,7 @@ def make_choice(column):
     moves.append(column)
     check_win(column, row)
     next_player(current_player)
+    root.update()
 
 
 def next_player(current_player):
@@ -828,6 +983,12 @@ def next_player(current_player):
             make_computer_move()
     else:
         current_player.set("HUMAN")
-
+        p1, p2, p3 = poisoned_rows_total(1, 0), poisoned_rows_total(2, 0), poisoned_rows_total(3, 0)
+        p4, p5, p6 = poisoned_rows_total(0, 1), poisoned_rows_total(0, 2), poisoned_rows_total(0, 3)
+        print(f"HUMAN {p1} {p2} {p3} tot={p1 + p2 * 2 + p3 * 4}")
+        print(f"COMPUTER {p4} {p5} {p6} tot={p4 + p5 * 2 + p6 * 4}")
+        current_estimate_score = (p1 + p2 * 2 + p3 * 4) - (p4 + p5 * 2 + p6 * 4)
+        print(f"overall = {current_estimate_score}")
+        overall_estimate.append(current_estimate_score)
 
 root.mainloop()
